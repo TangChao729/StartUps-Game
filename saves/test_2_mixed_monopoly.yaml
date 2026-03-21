@@ -1,0 +1,115 @@
+# Test Scenario 2: Mixed - Some Companies Tied, Some with Clear Leaders
+#
+# Alice's trigger hand card (company_c #3) is in PLAY phase.
+# After Alice invests it, company_c is Bob=3, Alice=2, Charlie=1 -> Bob leads strictly.
+#
+# Tableau layout (before hand card is played):
+#   company_a (5 total, #5 removed):     Alice 3, Bob 1, Charlie 0         -> Alice leads (strictly)
+#   company_b (6 total):                  Bob 4, Alice 1, Charlie 1         -> Bob leads (strictly)
+#   company_c (7 total, #7 removed):      Bob 3, Alice 1+hand, Charlie 1    -> after invest: Bob 3, Alice 2, Charlie 1 -> Bob leads (strictly)
+#   company_d (8 total):                  Charlie 5, Alice 1, Bob 2         -> Charlie leads (strictly)
+#   company_e (9 total, #9 removed):      Alice 3, Bob 3, Charlie 2         -> TIED -> AM token e->Alice -> Alice leads
+#   company_f (10 total, #9,#10 removed): Alice 3, Bob 3, Charlie 2         -> TIED -> AM token f->Bob  -> Bob leads
+#
+# AM tokens: a->Alice, b->Bob, c->Bob, d->Charlie, e->Alice, f->Bob
+#
+# Expected scoring (Alice invests company_c #3):
+#   company_a: Alice leads (3). Bob 1 pays $1 -> Alice +$3. Charlie 0, no payment.
+#   company_b: Bob leads (4). Alice 1 pays $1 -> Bob +$3. Charlie 1 pays $1 -> Bob +$3. Bob gains $6.
+#   company_c: Bob leads (3). Alice 2 pays $2 -> Bob +$6. Charlie 1 pays $1 -> Bob +$3. Bob gains $9.
+#   company_d: Charlie leads (5). Alice 1 pays $1 -> Charlie +$3. Bob 2 pays $2 -> Charlie +$6. Charlie gains $9.
+#   company_e: Alice leads (AM tiebreak, tied with Bob at 3). Bob 3 pays $3 -> Alice +$9. Charlie 2 pays $2 -> Alice +$6. Alice gains $15.
+#   company_f: Bob leads (AM tiebreak, tied with Alice at 3). Alice 3 pays $3 -> Bob +$9. Charlie 2 pays $2 -> Bob +$6. Bob gains $15.
+#
+# Step-by-step running totals (no player runs out of $1 coins, all payments succeed):
+#   After company_a: Alice 10+3  = 13,  Bob 10-1  =  9,  Charlie 10
+#   After company_b: Alice 13-1  = 12,  Bob  9+6  = 15,  Charlie 10-1 =  9
+#   After company_c: Alice 12-2  = 10,  Bob 15+9  = 24,  Charlie  9-1 =  8
+#   After company_d: Alice 10-1  =  9,  Bob 24-2  = 22,  Charlie  8+9 = 17
+#   After company_e: Alice  9+15 = 24,  Bob 22-3  = 19,  Charlie 17-2 = 15
+#   After company_f: Alice 24-3  = 21,  Bob 19+15 = 34,  Charlie 15-2 = 13
+#
+# Winner: Bob with $34.
+
+save_name: test_2_mixed_monopoly
+saved_at: '2026-01-01T00:00:01'
+game_phase: PLAYING
+turn_phase: PLAY
+current_player_index: 0
+last_market_buy_company_id: null
+
+removed_cards:
+  - {company_id: company_a, number: 5}
+  - {company_id: company_c, number: 7}
+  - {company_id: company_e, number: 9}
+  - {company_id: company_f, number: 9}
+  - {company_id: company_f, number: 10}
+
+deck: []
+
+market:
+  slots: []
+
+am_tokens:
+  company_a: Alice
+  company_b: Bob
+  company_c: Bob
+  company_d: Charlie
+  company_e: Alice
+  company_f: Bob
+
+players:
+  - name: Alice
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand:
+      - {company_id: company_c, number: 3}
+    tableau:
+      - {company_id: company_a, number: 1}
+      - {company_id: company_a, number: 2}
+      - {company_id: company_a, number: 3}
+      - {company_id: company_b, number: 1}
+      - {company_id: company_c, number: 1}
+      - {company_id: company_d, number: 1}
+      - {company_id: company_e, number: 1}
+      - {company_id: company_e, number: 2}
+      - {company_id: company_e, number: 3}
+      - {company_id: company_f, number: 1}
+      - {company_id: company_f, number: 2}
+      - {company_id: company_f, number: 3}
+
+  - name: Bob
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand: []
+    tableau:
+      - {company_id: company_a, number: 4}
+      - {company_id: company_b, number: 2}
+      - {company_id: company_b, number: 3}
+      - {company_id: company_b, number: 4}
+      - {company_id: company_b, number: 5}
+      - {company_id: company_c, number: 4}
+      - {company_id: company_c, number: 5}
+      - {company_id: company_c, number: 6}
+      - {company_id: company_d, number: 2}
+      - {company_id: company_d, number: 3}
+      - {company_id: company_e, number: 4}
+      - {company_id: company_e, number: 5}
+      - {company_id: company_e, number: 6}
+      - {company_id: company_f, number: 4}
+      - {company_id: company_f, number: 5}
+      - {company_id: company_f, number: 6}
+
+  - name: Charlie
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand: []
+    tableau:
+      - {company_id: company_b, number: 6}
+      - {company_id: company_c, number: 2}
+      - {company_id: company_d, number: 4}
+      - {company_id: company_d, number: 5}
+      - {company_id: company_d, number: 6}
+      - {company_id: company_d, number: 7}
+      - {company_id: company_d, number: 8}
+      - {company_id: company_e, number: 7}
+      - {company_id: company_e, number: 8}
+      - {company_id: company_f, number: 7}
+      - {company_id: company_f, number: 8}

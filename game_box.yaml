@@ -1,0 +1,102 @@
+# ============================================================
+# StartUps — Game Box Definition
+# This file defines every physical component in the game box.
+# The model layer loads from here so rules never live in code.
+# ============================================================
+
+meta:
+  name: StartUps
+  publisher: Oink Games
+  min_players: 3
+  max_players: 7
+  version: "1.0"
+
+# ----------------------------------------------------------
+# COMPANIES
+# Each company is a distinct investment category.
+# Players compete to hold the most shares (cards) in each.
+# ----------------------------------------------------------
+companies:
+  - id: company_a
+    name: Giraffe Beer
+    color: orange
+    card_count: 5
+
+  - id: company_b
+    name: Bowwow Games
+    color: blue
+    card_count: 6
+
+  - id: company_c
+    name: Flamingo Soft
+    color: pink
+    card_count: 7
+
+  - id: company_d
+    name: Octo Coffee
+    color: coffee
+    card_count: 8
+
+  - id: company_e
+    name: Hippo Powertech
+    color: green
+    card_count: 9
+
+  - id: company_f
+    name: EMT Elephant Mars Travel
+    color: red
+    card_count: 10
+
+# ----------------------------------------------------------
+# CARDS
+# Each card belongs to a company and has a face value.
+# Cards are placed in a player's tableau to claim shares.
+# ----------------------------------------------------------
+
+
+# ----------------------------------------------------------
+# MARKET
+# The face-up row of cards available for purchase each turn.
+# ----------------------------------------------------------
+
+
+# ----------------------------------------------------------
+# COINS / MONEY
+# The currency used to buy cards.4
+# ----------------------------------------------------------
+coins:
+  denominations: [1, 3]
+  total_per_denomination:
+    1: 70
+    3: 70
+  starting_money: 10
+
+# ----------------------------------------------------------
+# ANTI-MONOPOLY CHIPS
+# Special chips that penalise or block a single-company majority.
+# One per company; placed on the market when triggered.
+# ----------------------------------------------------------
+anti_monopoly_chips:
+  one_per_company: true   # there is exactly one chip per company
+
+# ----------------------------------------------------------
+# SCORING RULES
+# End-of-game point calculation.
+# ----------------------------------------------------------
+
+# ----------------------------------------------------------
+# TURN STRUCTURE
+# Defines the legal actions a player may take on their turn.
+# ----------------------------------------------------------
+turn:
+  legal_actions:
+    - id: buy_from_market
+      description: buy a card from the market, either from the face-down deck or from the face-up market
+    - id: play_card
+      description: play a card from your hand to the table, either purchase it as your investment, or place it in the market make it purchasable by other players
+
+# ----------------------------------------------------------
+# GAME END CONDITION
+# ----------------------------------------------------------
+end_condition:
+  trigger: the deck is exhausted

@@ -1,0 +1,150 @@
+save_name: save_2026-03-03_17-08-14
+saved_at: '2026-03-03T17:08:20'
+game_phase: PLAYING
+turn_phase: BUY
+current_player_index: 2
+last_market_buy_company_id: null
+removed_cards:
+- company_id: company_f
+  number: 3
+- company_id: company_e
+  number: 3
+- company_id: company_a
+  number: 3
+- company_id: company_b
+  number: 2
+- company_id: company_e
+  number: 8
+deck:
+- company_id: company_a
+  number: 5
+- company_id: company_e
+  number: 2
+- company_id: company_f
+  number: 5
+- company_id: company_b
+  number: 4
+- company_id: company_c
+  number: 4
+- company_id: company_b
+  number: 1
+- company_id: company_d
+  number: 8
+- company_id: company_d
+  number: 4
+- company_id: company_e
+  number: 1
+- company_id: company_c
+  number: 1
+- company_id: company_b
+  number: 5
+- company_id: company_d
+  number: 2
+- company_id: company_e
+  number: 5
+- company_id: company_e
+  number: 4
+- company_id: company_e
+  number: 7
+- company_id: company_c
+  number: 3
+- company_id: company_d
+  number: 1
+- company_id: company_f
+  number: 2
+- company_id: company_a
+  number: 2
+- company_id: company_d
+  number: 5
+- company_id: company_c
+  number: 2
+- company_id: company_f
+  number: 6
+- company_id: company_e
+  number: 9
+- company_id: company_d
+  number: 3
+- company_id: company_e
+  number: 6
+- company_id: company_b
+  number: 3
+- company_id: company_c
+  number: 6
+- company_id: company_a
+  number: 4
+- company_id: company_f
+  number: 8
+market:
+  slots: []
+am_tokens:
+  company_a: null
+  company_b: null
+  company_c: null
+  company_d: null
+  company_e: null
+  company_f: Alice
+players:
+- name: Alice
+  coins:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  hand:
+  - company_id: company_d
+    number: 7
+  - company_id: company_a
+    number: 1
+  - company_id: company_b
+    number: 6
+  tableau:
+  - company_id: company_f
+    number: 10
+- name: Bob
+  coins:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  hand:
+  - company_id: company_c
+    number: 5
+  - company_id: company_c
+    number: 7
+  - company_id: company_f
+    number: 1
+  tableau:
+  - company_id: company_f
+    number: 9
+- name: Charlie
+  coins:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  hand:
+  - company_id: company_f
+    number: 7
+  - company_id: company_f
+    number: 4
+  - company_id: company_d
+    number: 6
+  tableau: []

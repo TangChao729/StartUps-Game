@@ -1,0 +1,108 @@
+# Test Scenario 3: All Companies Tied — No Payments Made
+#
+# Every active company ends in a strict 3-way tie (all players share max count).
+# Since no AM-token holder is among the candidates (all null), no leader is
+# declared for any company → no payments → everyone keeps their $10.
+#
+# Removed cards (5 total):
+#   company_a #4, #5       → 3 cards in play (#1-#3)
+#   company_c #7           → 6 cards in play (#1-#6)
+#   company_d #7, #8       → 6 cards in play (#1-#6)
+#   (company_b, company_e, company_f: nothing removed)
+#
+# Tableau counts per company (after Charlie trades company_f #10 to market):
+#   company_a: Alice 1, Bob 1, Charlie 1  →  1-1-1 TIED
+#   company_b: Alice 2, Bob 2, Charlie 2  →  2-2-2 TIED
+#   company_c: Alice 2, Bob 2, Charlie 2  →  2-2-2 TIED
+#   company_d: Alice 2, Bob 2, Charlie 2  →  2-2-2 TIED
+#   company_e: Alice 3, Bob 3, Charlie 3  →  3-3-3 TIED
+#   company_f: Alice 3, Bob 3, Charlie 3  →  3-3-3 TIED
+#                         (company_f #10 ends up in market, not scored)
+#
+# AM tokens: all null (nobody held strict majority at any point)
+#
+# Expected scoring: no payments in any company.
+# Final standings: Alice $10, Bob $10, Charlie $10 — three-way tie.
+
+save_name: test_3_all_tied
+saved_at: '2026-01-01T00:00:02'
+game_phase: PLAYING
+turn_phase: PLAY
+current_player_index: 2
+last_market_buy_company_id: null
+
+removed_cards:
+  - {company_id: company_a, number: 4}
+  - {company_id: company_a, number: 5}
+  - {company_id: company_c, number: 7}
+  - {company_id: company_d, number: 7}
+  - {company_id: company_d, number: 8}
+
+deck: []
+
+market:
+  slots: []
+
+am_tokens:
+  company_a: null
+  company_b: null
+  company_c: null
+  company_d: null
+  company_e: null
+  company_f: null
+
+players:
+  - name: Alice
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand: []
+    tableau:
+      - {company_id: company_a, number: 1}
+      - {company_id: company_b, number: 1}
+      - {company_id: company_b, number: 2}
+      - {company_id: company_c, number: 1}
+      - {company_id: company_c, number: 2}
+      - {company_id: company_d, number: 1}
+      - {company_id: company_d, number: 2}
+      - {company_id: company_e, number: 1}
+      - {company_id: company_e, number: 2}
+      - {company_id: company_e, number: 3}
+      - {company_id: company_f, number: 1}
+      - {company_id: company_f, number: 2}
+      - {company_id: company_f, number: 3}
+
+  - name: Bob
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand: []
+    tableau:
+      - {company_id: company_a, number: 2}
+      - {company_id: company_b, number: 3}
+      - {company_id: company_b, number: 4}
+      - {company_id: company_c, number: 3}
+      - {company_id: company_c, number: 4}
+      - {company_id: company_d, number: 3}
+      - {company_id: company_d, number: 4}
+      - {company_id: company_e, number: 4}
+      - {company_id: company_e, number: 5}
+      - {company_id: company_e, number: 6}
+      - {company_id: company_f, number: 4}
+      - {company_id: company_f, number: 5}
+      - {company_id: company_f, number: 6}
+
+  - name: Charlie
+    coins: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    hand:
+      - {company_id: company_f, number: 10}
+    tableau:
+      - {company_id: company_a, number: 3}
+      - {company_id: company_b, number: 5}
+      - {company_id: company_b, number: 6}
+      - {company_id: company_c, number: 5}
+      - {company_id: company_c, number: 6}
+      - {company_id: company_d, number: 5}
+      - {company_id: company_d, number: 6}
+      - {company_id: company_e, number: 7}
+      - {company_id: company_e, number: 8}
+      - {company_id: company_e, number: 9}
+      - {company_id: company_f, number: 7}
+      - {company_id: company_f, number: 8}
+      - {company_id: company_f, number: 9}
