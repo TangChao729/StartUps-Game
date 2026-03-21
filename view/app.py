@@ -34,14 +34,40 @@ class AppMode(Enum):
     LOAD_PICKER      = auto()   # player is picking a save file to load
 
 
-def run(player_names: list[str] | None = None) -> None:
+def run(
+    player_names: list[str] | None = None,
+    ai_players: set[str] | None = None,
+) -> None:
+    """Launch a game session.
+
+    Args:
+        player_names: names of all players (default: Alice, Bob, Charlie).
+        ai_players:   subset of player_names that should be RandomAgent bots.
+                      Pass an empty set (or omit) for an all-human game.
+    """
+    from controller.session import GameSession
+    from controller.slots import AgentSlot, HumanSlot
+    from controller.agents.random_agent import RandomAgent
+
     box = load_game_box()
     if player_names is None:
         player_names = ["Alice", "Bob", "Charlie"]
+    if ai_players is None:
+        ai_players = set()
 
     state   = new_game(box, player_names)
     view    = ViewState()
     console = Console()
+
+    # Build slots: AI or human per player
+    slots = []
+    for name in player_names:
+        if name in ai_players:
+            slots.append(AgentSlot(name, RandomAgent()))
+        else:
+            slots.append(HumanSlot(name, state))
+
+    session = GameSession(state, slots)
 
     mode: AppMode  = AppMode.PLAYING
     confirm_cursor: int = 0             # cursor in the new-game confirm menu
@@ -68,6 +94,7 @@ def run(player_names: list[str] | None = None) -> None:
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if confirm_cursor == 0:     # Yes
                     state = new_game(box, player_names)
+                    _rebuild_session()
                     view  = ViewState()
                 mode = AppMode.PLAYING
             elif key in (readchar.key.ESCAPE, "q", "Q"):
@@ -111,6 +138,7 @@ def run(player_names: list[str] | None = None) -> None:
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if load_saves_list:
                     state = load_game(load_saves_list[load_cursor], box)
+                    _rebuild_session()
                     view  = ViewState()
                 mode = AppMode.PLAYING
 
@@ -131,6 +159,7 @@ def run(player_names: list[str] | None = None) -> None:
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if view.menu_cursor == 0:       # Play Again
                     state = new_game(box, player_names)
+                    _rebuild_session()
                     view  = ViewState()
                 else:                           # Quit
                     _goodbye(console)
@@ -140,7 +169,13 @@ def run(player_names: list[str] | None = None) -> None:
                 return
             continue
 
-        # ── PLAYING mode ──────────────────────────────────────────
+        # ── AI turn: advance automatically ───────────────────────
+        current_slot = session.slots[state.current_player_index]
+        if not isinstance(current_slot, HumanSlot):
+            session.step()
+            continue
+
+        # ── PLAYING mode (human turn) ─────────────────────────────
         render_screen(console, state, view, actions)
         key = readchar.readkey()
 
@@ -188,6 +223,16 @@ def run(player_names: list[str] | None = None) -> None:
         elif key in ("q", "Q"):
             _goodbye(console)
             return
+
+    def _rebuild_session() -> None:
+        nonlocal session, state
+        new_slots = []
+        for name in player_names:
+            if name in ai_players:
+                new_slots.append(AgentSlot(name, RandomAgent()))
+            else:
+                new_slots.append(HumanSlot(name, state))
+        session = GameSession(state, new_slots)
 
 
 def _goodbye(console: Console) -> None:

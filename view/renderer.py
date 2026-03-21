@@ -54,7 +54,7 @@ def available_actions(state: GameState) -> list[Action]:
             1 for slot in state.market.slots
             if state.am_tokens.get(slot.card.company.id) is not player
         )
-        if state.deck:
+        if state.deck and player.money >= payable_count:
             cost_hint = f" (pay ${payable_count})" if payable_count else ""
             actions.append(Action(
                 f"Draw from deck{cost_hint}",
