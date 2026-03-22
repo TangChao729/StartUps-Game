@@ -37,6 +37,7 @@ def run_server(
     port:        int       = DEFAULT_PORT,
     human_names: list[str] = None,   # names for remote human slots (connect in order)
     ai_names:    list[str] = None,   # names for RandomAgent bots
+    debug:       bool      = False,  # print every action as it happens
 ) -> None:
     """Start the game server and run one game to completion.
 
@@ -103,9 +104,16 @@ def run_server(
     # ── Game loop ──────────────────────────────────────────────────
     try:
         while state.game_phase == GamePhase.PLAYING:
+            history_len_before = len(state.history)
             session._step()
 
+            if debug:
+                for line in state.history[history_len_before:]:
+                    print(f"[debug] {line}")
+
             if state.game_phase == GamePhase.GAME_OVER:
+                if debug:
+                    print("[debug] ─── GAME OVER ───")
                 break
 
             # Broadcast the updated state to every watching client.
@@ -146,5 +154,7 @@ if __name__ == "__main__":
                         metavar="NAME",
                         help="Names for AI (RandomAgent) players "
                              "(default: Charlie)")
+    parser.add_argument("--debug",  action="store_true",
+                        help="Print every player action to the server console")
     args = parser.parse_args()
-    run_server(args.host, args.port, args.humans, args.ai)
+    run_server(args.host, args.port, args.humans, args.ai, args.debug)
