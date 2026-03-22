@@ -85,6 +85,8 @@ def save_game(state: GameState, name: str) -> Path:
             }
             for p in state.players
         ],
+
+        "history": state.history,
     }
 
     path = SAVES_DIR / f"{name}.yaml"
@@ -146,6 +148,7 @@ def load_game(path: Path, box: GameBox) -> GameState:
         phase                      = TurnPhase[data.get("turn_phase", "BUY")],
         game_phase                 = GamePhase[data.get("game_phase", "PLAYING")],
         last_market_buy_company_id = data.get("last_market_buy_company_id"),
+        history                    = data.get("history", []),
     )
 
 

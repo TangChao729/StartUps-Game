@@ -18,8 +18,10 @@ from rich.text import Text
 from model.pieces import Card
 from model.state import GamePhase, GameState, TurnPhase
 
-PANEL_WIDTH = 52
-_SEP = "─" * (PANEL_WIDTH - 8)   # separator that fits inside the panel
+PANEL_WIDTH  = 52
+_SEP         = "─" * (PANEL_WIDTH - 8)   # separator that fits inside the panel
+MIN_PLAYERS  = 3
+MAX_PLAYERS  = 7
 
 COMPANY_COLOR: dict[str, str] = {
     "orange":  "orange3",
@@ -103,14 +105,25 @@ def available_actions(state: GameState) -> list[Action]:
 # VIEW STATE
 # ──────────────────────────────────────────────────────────────────
 
+HISTORY_VISIBLE = 18   # lines shown at once in the History panel
+
+
 @dataclass
 class ViewState:
     panel_index:    int = 0
     menu_cursor:    int = 0   # cursor in the player action menu
     session_cursor: int = 0   # cursor in the game session menu
+    history_scroll: int = 0   # index of the first visible history line
 
     def panel_count(self, num_players: int) -> int:
-        return 2 + num_players
+        return 3 + num_players   # Session | History | Market | Players…
+
+    def scroll_history(self, direction: int, total_lines: int) -> None:
+        """history_scroll is an offset from the bottom (0 = show newest).
+        UP key increases it (older entries); DOWN key decreases it (newer).
+        """
+        max_scroll = max(0, total_lines - HISTORY_VISIBLE)
+        self.history_scroll = max(0, min(self.history_scroll - direction, max_scroll))
 
     def navigate(self, direction: int, num_players: int) -> None:
         total = self.panel_count(num_players)
@@ -217,7 +230,64 @@ def render_game_session(state: GameState, view: ViewState) -> Panel:
 
 
 # ──────────────────────────────────────────────────────────────────
-# PANEL 1 — MARKET
+# PANEL 1 — HISTORY
+# ──────────────────────────────────────────────────────────────────
+
+def render_history(state: GameState, view: ViewState) -> Panel:
+    n       = view.panel_count(len(state.players))
+    lines   = state.history
+    total   = len(lines)
+    start   = view.history_scroll
+    end     = min(start + HISTORY_VISIBLE, total)
+    visible = lines[start:end]
+
+    # scroll=0 → show the very latest; scroll=N → N lines before the latest
+    end     = max(0, total - view.history_scroll)
+    start   = max(0, end - HISTORY_VISIBLE)
+    visible = lines[start:end]
+
+    t = Text()
+
+    if total == 0:
+        t.append("  (no moves yet)\n", style="dim italic")
+    else:
+        older = start
+        if older > 0:
+            t.append(f"  ▲ {older} older entries above\n", style="dim")
+        for line in visible:
+            if line.startswith("───"):
+                t.append(f"{line}\n", style="bold cyan")
+            elif "Drew from deck" in line:
+                t.append(line + "\n", style="white")
+            elif "Bought" in line:
+                t.append(line + "\n", style="green")
+            elif "Invested" in line:
+                t.append(line + "\n", style="yellow")
+            elif "Traded" in line:
+                t.append(line + "\n", style="magenta")
+            else:
+                t.append(line + "\n", style="white")
+        newer = total - end
+        if newer > 0:
+            t.append(f"  ▼ {newer} newer entries below\n", style="dim")
+
+    t.append("\n")
+    t.append("↑↓ scroll\n", style="dim italic")
+
+    return Panel(
+        t,
+        title=_nav_bar(2, n),
+        title_align="center",
+        subtitle="[dim]History[/dim]",
+        box=rbox.DOUBLE,
+        border_style="cyan",
+        width=PANEL_WIDTH,
+        padding=(0, 1),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────
+# PANEL 2 — MARKET
 # ──────────────────────────────────────────────────────────────────
 
 def render_market(state: GameState, view: ViewState) -> Panel:
@@ -255,7 +325,7 @@ def render_market(state: GameState, view: ViewState) -> Panel:
 
     return Panel(
         t,
-        title=_nav_bar(2, n),
+        title=_nav_bar(3, n),
         title_align="center",
         subtitle="[dim]Market[/dim]",
         box=rbox.DOUBLE,
@@ -276,7 +346,7 @@ def render_player(
     actions: list[Action],
 ) -> Panel:
     n            = view.panel_count(len(state.players))
-    panel_number = 3 + player_index
+    panel_number = 4 + player_index
     player       = state.players[player_index]
     is_current   = player_index == state.current_player_index
 
@@ -508,9 +578,86 @@ def render_screen(
     if idx == 0:
         panel = render_game_session(state, view)
     elif idx == 1:
+        panel = render_history(state, view)
+    elif idx == 2:
         panel = render_market(state, view)
     else:
-        panel = render_player(state, view, idx - 2, actions)
+        panel = render_player(state, view, idx - 3, actions)
 
     console.print(panel)
     console.print("\n  [dim]← → navigate panels[/dim]")
+
+
+# ──────────────────────────────────────────────────────────────────
+# LOBBY SCREEN  (player setup before a game starts)
+# ──────────────────────────────────────────────────────────────────
+
+@dataclass
+class LobbySlot:
+    """One player seat in the lobby — a name and a human/AI flag."""
+    name:  str
+    is_ai: bool = False
+
+
+def render_lobby(
+    console:       Console,
+    slots:         list[LobbySlot],
+    cursor:        int,
+    editing_index: int | None,
+    edit_buf:      list[str],
+) -> None:
+    os.system("clear")
+    t = Text()
+    t.append(f"  {MIN_PLAYERS}–{MAX_PLAYERS} players\n\n", style="dim")
+
+    for i, slot in enumerate(slots):
+        selected = (cursor == i) and editing_index is None
+        editing  = (editing_index == i)
+        tag      = "[AI   ]" if slot.is_ai else "[Human]"
+        tag_sty  = "bright_blue" if slot.is_ai else "green"
+
+        if editing:
+            t.append(f"  ▶ Player {i + 1}:  ", style="bold yellow")
+            t.append("".join(edit_buf), style="white")
+            t.append("█  ", style="bright_white blink")
+            t.append(f"{tag}\n", style=tag_sty)
+        elif selected:
+            t.append(f"  ▶ Player {i + 1}:  ", style="bold yellow")
+            t.append(f"{slot.name:<16}", style="bold white")
+            t.append(f"{tag}\n", style=f"bold {tag_sty}")
+        else:
+            t.append(f"    Player {i + 1}:  ", style="dim")
+            t.append(f"{slot.name:<16}", style="white")
+            t.append(f"{tag}\n", style=tag_sty)
+
+    t.append("\n")
+    t.append(_SEP + "\n", style="dim")
+
+    # Start Game row (always last)
+    if cursor == len(slots) and editing_index is None:
+        t.append("  ▶ Start Game\n", style="bold green")
+    else:
+        t.append("    Start Game\n", style="green")
+
+    t.append("\n")
+    t.append(_SEP + "\n", style="dim")
+
+    if editing_index is not None:
+        t.append("Type name   ↵ confirm   ESC cancel\n", style="dim italic")
+    else:
+        hints = "↑↓ select   ←→ toggle AI   ↵ edit / start"
+        if len(slots) < MAX_PLAYERS:
+            hints += "   A add"
+        if len(slots) > MIN_PLAYERS:
+            hints += "   R remove"
+        hints += "   Q quit"
+        t.append(hints + "\n", style="dim italic")
+
+    console.print(Panel(
+        t,
+        title=Text("  StartUps — Player Setup  ", style="bold magenta"),
+        box=rbox.DOUBLE,
+        border_style="magenta",
+        width=PANEL_WIDTH,
+        padding=(0, 1),
+    ))

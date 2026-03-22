@@ -149,6 +149,7 @@ class GameState:
     game_phase: GamePhase = GamePhase.PLAYING
     last_market_buy_company_id: str | None = None  # trade restriction this turn
     result: GameResult | None = None
+    history: list[str] = field(default_factory=list)
 
     # ── Convenience ───────────────────────────────────────────────
 
@@ -185,6 +186,8 @@ class GameState:
 
         card = self.deck.pop(0)
         player.hand.append(card)
+        cost_str = f"paid ${cost}" if cost else "free"
+        self.history.append(f"  Drew from deck  ({cost_str})")
         self.phase = TurnPhase.PLAY
         return card
 
@@ -214,6 +217,8 @@ class GameState:
         player.hand.append(slot.card)
         player.coins.extend(slot.coins)   # collect stacked coins
 
+        bonus = f"  (+${slot.coin_value} bonus)" if slot.coin_value else ""
+        self.history.append(f"  Bought {slot.card.company.name} from market{bonus}")
         self.last_market_buy_company_id = slot.card.company.id
         self.phase = TurnPhase.PLAY
         return slot.card
@@ -232,6 +237,7 @@ class GameState:
         card = self._pop_from_hand(hand_index)
         player.tableau.append(card)
         self._update_am_token(card.company.id, player)
+        self.history.append(f"  Invested in {card.company.name}")
         self._end_turn()
         return card
 
@@ -249,6 +255,7 @@ class GameState:
                 f"Cannot trade {card.company.name} — it was bought from the market this turn."
             )
         card = self._pop_from_hand(hand_index)
+        self.history.append(f"  Traded {card.company.name} to market")
         self.market.slots.append(MarketSlot(card=card))
         self._end_turn()
         return card
@@ -384,6 +391,8 @@ class GameState:
         self.last_market_buy_company_id = None
         if not self.deck:
             self.score_game()
+        else:
+            self.history.append(f"─── {self.current_player.name}'s turn ───")
 
     def __repr__(self) -> str:
         if self.game_phase == GamePhase.GAME_OVER:
@@ -425,7 +434,7 @@ def new_game(box: GameBox, player_names: list[str]) -> GameState:
         for name in player_names
     ]
 
-    return GameState(
+    state = GameState(
         players=players,
         deck=deck,
         market=Market(),
@@ -434,3 +443,5 @@ def new_game(box: GameBox, player_names: list[str]) -> GameState:
         meta=box.meta,
         am_tokens={c.id: None for c in box.companies},
     )
+    state.history.append(f"─── {state.current_player.name}'s turn ───")
+    return state

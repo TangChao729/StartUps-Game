@@ -30,14 +30,17 @@ class SlotBase(ABC):
 class HumanSlot(SlotBase):
     """Slot backed by a human at a keyboard.  Uses the rich terminal UI.
 
-    Holds a reference to the live GameState so the renderer can display
-    the full board.  The session passes obs for the action labels, but
-    the renderer reads state directly for colours, coins, tableaux, etc.
+    Takes a mutable state_ref (a one-element list) so it always sees the
+    current GameState even after a load-game or new-game replaces it.
     """
 
-    def __init__(self, player_name: str, state: "GameState") -> None:  # noqa: F821
+    def __init__(self, player_name: str, state_ref: list) -> None:
         super().__init__(player_name)
-        self._state = state
+        self._state_ref = state_ref
+
+    @property
+    def _state(self):
+        return self._state_ref[0]
 
     def request_action(self, obs: dict) -> int:
         """Render the board and block on keyboard input until the player
@@ -47,7 +50,7 @@ class HumanSlot(SlotBase):
         from view.renderer import ViewState, available_actions, render_screen
 
         console = Console()
-        view    = ViewState(panel_index=2 + self._state.current_player_index)
+        view    = ViewState(panel_index=3 + self._state.current_player_index)
 
         while True:
             actions = available_actions(self._state)
@@ -71,7 +74,7 @@ class HumanSlot(SlotBase):
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 # Only confirm on the current player's own panel
                 if (
-                    view.panel_index - 2 == self._state.current_player_index
+                    view.panel_index - 3 == self._state.current_player_index
                     and actions
                 ):
                     cursor = min(view.menu_cursor, len(actions) - 1)

@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import os
-import sys
 from enum import Enum, auto
 
 import readchar
@@ -15,75 +14,180 @@ from model.loader import load_game_box
 from model.save_load import default_save_name, list_saves, load_game, save_game
 from model.state import GamePhase, new_game
 from view.renderer import (
+    LobbySlot,
     ViewState,
+    MIN_PLAYERS,
+    MAX_PLAYERS,
     _CONFIRM_OPTIONS,
     _OVER_OPTIONS,
     _SESSION_OPTIONS,
     available_actions,
     render_load_screen,
+    render_lobby,
     render_new_game_confirm,
     render_save_screen,
     render_screen,
 )
 
 
-class AppMode(Enum):
+# ── Top-level entry point ─────────────────────────────────────────
+
+def run() -> None:
+    """Launch the lobby, then loop: lobby → game → lobby (or quit)."""
+    console = Console()
+    box     = load_game_box()
+
+    while True:
+        lobby_slots = _run_lobby(console)
+        if lobby_slots is None:          # player pressed Q in lobby
+            _goodbye(console)
+            return
+
+        outcome = _run_game(console, box, lobby_slots)
+        if outcome == "quit":
+            _goodbye(console)
+            return
+        # "new_game" and "play_again" both go back to the lobby
+
+
+# ── Lobby ─────────────────────────────────────────────────────────
+
+def _run_lobby(console: Console) -> list[LobbySlot] | None:
+    """Show the player-setup screen.
+
+    Returns a non-empty list of LobbySlot when the player confirms, or
+    None when they press Q to quit the application.
+    """
+    slots         = [LobbySlot("Alice"), LobbySlot("Bob"), LobbySlot("Charlie")]
+    cursor        = 0           # row index (0..len(slots) = Start Game)
+    editing_index: int | None = None
+    edit_buf:      list[str]  = []
+
+    while True:
+        render_lobby(console, slots, cursor, editing_index, edit_buf)
+        key = readchar.readkey()
+
+        # ── Name-editing sub-mode ──────────────────────────────────
+        if editing_index is not None:
+            if key in (readchar.key.ENTER, "\r", "\n"):
+                name = "".join(edit_buf).strip()
+                if name:
+                    slots[editing_index].name = name
+                editing_index = None
+                edit_buf      = []
+
+            elif key == readchar.key.ESCAPE:
+                editing_index = None
+                edit_buf      = []
+
+            elif key in (readchar.key.BACKSPACE, "\x08", "\x7f"):
+                if edit_buf:
+                    edit_buf.pop()
+
+            elif key.isprintable():
+                edit_buf.append(key)
+
+            continue
+
+        # ── Normal navigation ──────────────────────────────────────
+        total_rows = len(slots) + 1   # player rows + Start Game
+
+        if key == readchar.key.UP:
+            cursor = (cursor - 1) % total_rows
+
+        elif key == readchar.key.DOWN:
+            cursor = (cursor + 1) % total_rows
+
+        elif key in (readchar.key.LEFT, readchar.key.RIGHT):
+            if cursor < len(slots):
+                slots[cursor].is_ai = not slots[cursor].is_ai
+
+        elif key in (readchar.key.ENTER, "\r", "\n"):
+            if cursor == len(slots):        # Start Game
+                if len(slots) >= MIN_PLAYERS:
+                    return slots
+            else:                           # edit player name
+                editing_index = cursor
+                edit_buf      = list(slots[cursor].name)
+
+        elif key in ("a", "A"):
+            if len(slots) < MAX_PLAYERS:
+                new_index = len(slots)
+                slots.append(LobbySlot(f"Player {new_index + 1}"))
+                cursor = new_index          # jump to new row
+
+        elif key in ("r", "R"):
+            if len(slots) > MIN_PLAYERS:
+                slots.pop(cursor)
+                cursor = min(cursor, len(slots))   # clamp; may land on Start Game
+
+        elif key in ("q", "Q"):
+            return None
+
+
+# ── Game ──────────────────────────────────────────────────────────
+
+class _GameMode(Enum):
     PLAYING          = auto()
-    NEW_GAME_CONFIRM = auto()   # confirm before wiping current session
-    SAVE_INPUT       = auto()   # player is typing a save-file name
-    LOAD_PICKER      = auto()   # player is picking a save file to load
+    NEW_GAME_CONFIRM = auto()
+    SAVE_INPUT       = auto()
+    LOAD_PICKER      = auto()
 
 
-def run(
-    player_names: list[str] | None = None,
-    ai_players: set[str] | None = None,
-) -> None:
-    """Launch a game session.
+def _run_game(
+    console:     Console,
+    box,
+    lobby_slots: list[LobbySlot],
+) -> str:
+    """Run one full game session.
 
-    Args:
-        player_names: names of all players (default: Alice, Bob, Charlie).
-        ai_players:   subset of player_names that should be RandomAgent bots.
-                      Pass an empty set (or omit) for an all-human game.
+    Returns:
+        "quit"       — user wants to exit the application
+        "new_game"   — user chose New Game (go back to lobby)
+        "play_again" — user chose Play Again after game over (go back to lobby)
     """
     from controller.session import GameSession
     from controller.slots import AgentSlot, HumanSlot
     from controller.agents.random_agent import RandomAgent
 
-    box = load_game_box()
-    if player_names is None:
-        player_names = ["Alice", "Bob", "Charlie"]
-    if ai_players is None:
-        ai_players = set()
+    player_names = [ls.name  for ls in lobby_slots]
+    ai_set       = {ls.name  for ls in lobby_slots if ls.is_ai}
 
-    state   = new_game(box, player_names)
+    # state_ref is a one-element list so HumanSlots always see the current state
+    # even after load-game / new-game replaces the state object.
+    state     = new_game(box, player_names)
+    state_ref = [state]
+
+    def make_slots() -> list:
+        return [
+            AgentSlot(name, RandomAgent()) if name in ai_set
+            else HumanSlot(name, state_ref)
+            for name in player_names
+        ]
+
+    def make_session() -> GameSession:
+        return GameSession(state_ref[0], make_slots())
+
+    session = make_session()
     view    = ViewState()
-    console = Console()
 
-    # Build slots: AI or human per player
-    slots = []
-    for name in player_names:
-        if name in ai_players:
-            slots.append(AgentSlot(name, RandomAgent()))
-        else:
-            slots.append(HumanSlot(name, state))
-
-    session = GameSession(state, slots)
-
-    mode: AppMode  = AppMode.PLAYING
-    confirm_cursor: int = 0             # cursor in the new-game confirm menu
-    save_buf: list[str] = []            # character buffer for save-name input
-    load_saves_list     = []            # save files shown in the load picker
-    load_cursor: int    = 0
+    mode: _GameMode    = _GameMode.PLAYING
+    confirm_cursor     = 1          # default to "No" (safer)
+    save_buf: list[str] = []
+    load_saves_list     = []
+    load_cursor         = 0
 
     while True:
+        state = state_ref[0]        # always read through the ref
+
         actions = (
             available_actions(state)
             if state.game_phase != GamePhase.GAME_OVER
             else []
         )
 
-        # ── NEW GAME CONFIRM mode ─────────────────────────────────
-        if mode == AppMode.NEW_GAME_CONFIRM:
+        # ── NEW GAME CONFIRM ──────────────────────────────────────
+        if mode == _GameMode.NEW_GAME_CONFIRM:
             render_new_game_confirm(console, confirm_cursor)
             key = readchar.readkey()
 
@@ -93,61 +197,50 @@ def run(
                 confirm_cursor = (confirm_cursor + 1) % len(_CONFIRM_OPTIONS)
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if confirm_cursor == 0:     # Yes
-                    state = new_game(box, player_names)
-                    _rebuild_session()
-                    view  = ViewState()
-                mode = AppMode.PLAYING
+                    return "new_game"
+                mode = _GameMode.PLAYING
             elif key in (readchar.key.ESCAPE, "q", "Q"):
-                mode = AppMode.PLAYING
-
+                mode = _GameMode.PLAYING
             continue
 
-        # ── SAVE INPUT mode ───────────────────────────────────────
-        if mode == AppMode.SAVE_INPUT:
+        # ── SAVE INPUT ────────────────────────────────────────────
+        if mode == _GameMode.SAVE_INPUT:
             render_save_screen(console, save_buf)
             key = readchar.readkey()
 
             if key in (readchar.key.ENTER, "\r", "\n"):
                 name = "".join(save_buf).strip() or default_save_name()
                 save_game(state, name)
-                mode = AppMode.PLAYING
-
+                mode = _GameMode.PLAYING
             elif key == readchar.key.ESCAPE:
-                mode = AppMode.PLAYING
-
+                mode = _GameMode.PLAYING
             elif key in (readchar.key.BACKSPACE, "\x08", "\x7f"):
                 if save_buf:
                     save_buf.pop()
-
             elif key.isprintable():
                 save_buf.append(key)
-
             continue
 
-        # ── LOAD PICKER mode ──────────────────────────────────────
-        if mode == AppMode.LOAD_PICKER:
+        # ── LOAD PICKER ───────────────────────────────────────────
+        if mode == _GameMode.LOAD_PICKER:
             render_load_screen(console, load_saves_list, load_cursor)
             key = readchar.readkey()
 
             if key == readchar.key.UP:
                 load_cursor = max(0, load_cursor - 1)
-
             elif key == readchar.key.DOWN:
                 load_cursor = min(len(load_saves_list) - 1, load_cursor + 1)
-
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if load_saves_list:
-                    state = load_game(load_saves_list[load_cursor], box)
-                    _rebuild_session()
-                    view  = ViewState()
-                mode = AppMode.PLAYING
-
+                    state_ref[0] = load_game(load_saves_list[load_cursor], box)
+                    session      = make_session()
+                    view         = ViewState()
+                mode = _GameMode.PLAYING
             elif key in (readchar.key.ESCAPE, "q", "Q"):
-                mode = AppMode.PLAYING
-
+                mode = _GameMode.PLAYING
             continue
 
-        # ── GAME OVER screen ──────────────────────────────────────
+        # ── GAME OVER ─────────────────────────────────────────────
         if state.game_phase == GamePhase.GAME_OVER:
             render_screen(console, state, view, actions)
             key = readchar.readkey()
@@ -158,24 +251,21 @@ def run(
                 view.menu_cursor = (view.menu_cursor + 1) % len(_OVER_OPTIONS)
             elif key in (readchar.key.ENTER, "\r", "\n"):
                 if view.menu_cursor == 0:       # Play Again
-                    state = new_game(box, player_names)
-                    _rebuild_session()
-                    view  = ViewState()
+                    return "play_again"
                 else:                           # Quit
-                    _goodbye(console)
-                    return
+                    return "quit"
             elif key in ("q", "Q"):
-                _goodbye(console)
-                return
+                return "quit"
             continue
 
-        # ── AI turn: advance automatically ───────────────────────
+        # ── AI turn: advance automatically ────────────────────────
         current_slot = session.slots[state.current_player_index]
-        if not isinstance(current_slot, HumanSlot):
+        from controller.slots import HumanSlot as _HumanSlot
+        if not isinstance(current_slot, _HumanSlot):
             session.step()
             continue
 
-        # ── PLAYING mode (human turn) ─────────────────────────────
+        # ── PLAYING (human turn) ──────────────────────────────────
         render_screen(console, state, view, actions)
         key = readchar.readkey()
 
@@ -188,12 +278,16 @@ def run(
         elif key == readchar.key.UP:
             if view.panel_index == 0:
                 view.move_session_cursor(-1)
+            elif view.panel_index == 1:
+                view.scroll_history(-1, len(state.history))
             else:
                 view.move_cursor(-1, len(actions))
 
         elif key == readchar.key.DOWN:
             if view.panel_index == 0:
                 view.move_session_cursor(1)
+            elif view.panel_index == 1:
+                view.scroll_history(1, len(state.history))
             else:
                 view.move_cursor(1, len(actions))
 
@@ -201,39 +295,28 @@ def run(
             if view.panel_index == 0:
                 opt = _SESSION_OPTIONS[view.session_cursor]
                 if opt == "New Game":
-                    confirm_cursor = 1      # default to "No" (safer)
-                    mode = AppMode.NEW_GAME_CONFIRM
+                    confirm_cursor = 1
+                    mode = _GameMode.NEW_GAME_CONFIRM
                 elif opt == "Save Game":
                     save_buf = list(default_save_name())
-                    mode = AppMode.SAVE_INPUT
+                    mode = _GameMode.SAVE_INPUT
                 elif opt == "Load Game":
                     load_saves_list = list_saves()
-                    load_cursor = 0
-                    mode = AppMode.LOAD_PICKER
+                    load_cursor     = 0
+                    mode = _GameMode.LOAD_PICKER
                 elif opt == "Quit":
-                    _goodbye(console)
-                    return
+                    return "quit"
             else:
-                # Execute game action only on the current player's own panel
-                if view.panel_index - 2 == state.current_player_index and actions:
+                if view.panel_index - 3 == state.current_player_index and actions:
                     cursor = min(view.menu_cursor, len(actions) - 1)
                     actions[cursor].execute()
                     view.reset_action_cursor()
 
         elif key in ("q", "Q"):
-            _goodbye(console)
-            return
+            return "quit"
 
-    def _rebuild_session() -> None:
-        nonlocal session, state
-        new_slots = []
-        for name in player_names:
-            if name in ai_players:
-                new_slots.append(AgentSlot(name, RandomAgent()))
-            else:
-                new_slots.append(HumanSlot(name, state))
-        session = GameSession(state, new_slots)
 
+# ── Helpers ───────────────────────────────────────────────────────
 
 def _goodbye(console: Console) -> None:
     os.system("clear")
