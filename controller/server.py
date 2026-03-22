@@ -97,9 +97,14 @@ def run_server(
 
     session = GameSession(state, slots)
 
-    # Send initial state so every client can render before the first action
+    # Send initial state to watching clients.
+    # The first-active remote player will receive their state from
+    # request_action(); sending it here too would create a duplicate
+    # that puts their client one step out of sync.
+    first_idx = state.current_player_index
     for remote in remote_slots:
-        remote.send_state(state)
+        if remote.player_index != first_idx:
+            remote.send_state(state)
 
     # ── Game loop ──────────────────────────────────────────────────
     try:
