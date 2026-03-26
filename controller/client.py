@@ -14,7 +14,6 @@ import json
 import os
 import socket
 import sys
-import termios
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -215,18 +214,6 @@ def run_client(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
         sock.close()
 
 
-def _drain_stdin() -> None:
-    """Flush any buffered keyboard input (e.g. the \\n left after \\r from Enter).
-
-    Prevents a stale keypress from firing an unintended action in the next
-    readchar.readkey() call.  Silently ignored on platforms without termios.
-    """
-    try:
-        termios.tcflush(sys.stdin, termios.TCIFLUSH)
-    except Exception:
-        pass
-
-
 def _handle_my_turn(
     console:  Console,
     state:    GameState,
@@ -268,9 +255,6 @@ def _handle_my_turn(
                 cursor = min(view.menu_cursor, len(actions) - 1)
                 send({"type": "action", "index": cursor})
                 view.reset_action_cursor()
-                _drain_stdin()          # discard any buffered keypresses
-                os.system("clear")
-                console.print("\n  [dim]Action sent — waiting for server...[/dim]")
                 return   # wait for next state from server
 
         elif key in ("q", "Q"):
